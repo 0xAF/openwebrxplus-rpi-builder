@@ -12,7 +12,7 @@ MAKEFLAGS="-j$(nproc --ignore 4)"
 #fi
 
 get_owrxp_version() {
-	curl -s -L -H "Accept: application/vnd.github+json" https://api.github.com/repos/luarvique/ppa/contents/bookworm/arm64 |
+	curl -s -L -H "Accept: application/vnd.github+json" https://api.github.com/repos/luarvique/ppa/contents/bookworm/armhf |
 		grep -E 'name.*openwebrx_[^_]+_.*' |
 		cut -d'_' -f 2 |
 		sort -V |
@@ -22,8 +22,8 @@ get_owrxp_version() {
 
 VER=$(get_owrxp_version)
 
-echo "Building RPI-64bit image for OpenWebRX+ v${VER}"
-echo "IMG_SUFFIX=\"-${VER}\"" > stage7/EXPORT_IMAGE
+echo "Building RPI-32bit image for OpenWebRX+ v${VER}"
+echo "IMG_SUFFIX=\"-32bit-v${VER}\"" > stage7/EXPORT_IMAGE
 
 # preserve the container after the build, so we can add new stuff after a successful build
 echo
