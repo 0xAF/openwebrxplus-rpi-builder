@@ -6,9 +6,15 @@ artefacts/
 old/
 owrx/
 emu-data/
+pi-ci-fallback-kernel.img
+pi-emu-kernel.img
+pi-emu-kernel-src/
 postrun.sh
 SKIP
 SKIP_IMAGES
 .pc
 *-pc
 .vscode/
+*OpenWebRX*.zip
+*OpenWebRX*.img
+

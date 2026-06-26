@@ -25,9 +25,11 @@ liblapack-dev
 gfortran
 libcurl4-openssl-dev
 libfftw3-dev
-libvolk2-dev
+libvolk-dev
 libpng-dev
 libnng-dev
 libtiff-dev
 libarmadillo-dev
 libjemalloc-dev
+libsqlite3-dev
+pkg-config

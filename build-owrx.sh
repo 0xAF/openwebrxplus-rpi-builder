@@ -1,5 +1,9 @@
 #!/bin/bash
 
+sudo modprobe loop 2>/dev/null || true
+docker builder prune -f
+docker image prune -f
+
 mkdir -p owrx/work owrx/deploy
 DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 

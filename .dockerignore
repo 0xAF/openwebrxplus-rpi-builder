@@ -7,3 +7,11 @@ work/
 deploy/
 apt-cacher-ng/
 .git/objects/*
+emu-data/
+pi-emu-kernel.img
+pi-emu-kernel-src/
+.vscode/
+pi-ci-fallback-kernel.img
+*OpenWebRX*.zip
+*OpenWebRX*.img
+

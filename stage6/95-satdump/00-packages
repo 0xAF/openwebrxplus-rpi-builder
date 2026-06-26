@@ -1,4 +1,5 @@
-libvolk2.5
+libvolk3.2
 libnng1
-libarmadillo11
+libarmadillo14
 libjemalloc2
+libsqlite3-0

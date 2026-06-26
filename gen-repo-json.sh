@@ -3,67 +3,77 @@ set -euo pipefail
 
 REPO="luarvique/openwebrx"
 ICON_URL="https://www.receiverbook.de/static/img/openwebrx-avatar.png"
-OUTFILE="repo.json"
+DEPLOY_DIR="deploy"
 
-echo "Fetching latest release metadata..."
-LATEST_JSON=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
+declare -A LABEL=( [64bit]="64-bit" [32bit]="32-bit" )
+declare -A DEVICES=(
+  [64bit]='["pi5-64bit","pi4-64bit","pi3-64bit"]'
+  [32bit]='["pi5-32bit","pi4-32bit","pi3-32bit"]'
+)
 
-TAG=$(echo "$LATEST_JSON" | jq -r .tag_name)
-ASSETS_JSON=$(echo "$LATEST_JSON" | jq -c '.assets[]')
+found=0
 
-URL_64=$(echo "$ASSETS_JSON" | jq -r 'select(.name | test("image_.*OpenWebRX(%2B|\\+)-64bit.*\\.zip")) | .browser_download_url')
-URL_32=$(echo "$ASSETS_JSON" | jq -r 'select(.name | test("image_.*OpenWebRX(%2B|\\+)-32bit.*\\.zip")) | .browser_download_url')
+for bits in 64bit 32bit; do
+  zipfile=$(find "$DEPLOY_DIR" -maxdepth 1 -name "image_*-OpenWebRX+-${bits}-v*.zip" -print -quit)
+  [[ -z "$zipfile" ]] && continue
 
-if [[ -z "$URL_64" ]]; then
-    echo "ERROR: No 64-bit image found. This is required."
-    exit 1
-fi
+  fname=$(basename "$zipfile")
+  if [[ ! "$fname" =~ ^image_([0-9]{4}-[0-9]{2}-[0-9]{2})-OpenWebRX\+-${bits}-v(.+)\.zip$ ]]; then
+    echo "WARNING: $fname doesn't match the expected naming pattern, skipping" >&2
+    continue
+  fi
+  date="${BASH_REMATCH[1]}"
+  ver="${BASH_REMATCH[2]}"
 
-SHA_64=$(echo "$ASSETS_JSON" | jq -r 'select(.name | test("image_.*OpenWebRX(%2B|\\+)-64bit.*\\.zip")) | .digest' | sed 's/^sha256://')
-SHA_32=$(echo "$ASSETS_JSON" | jq -r 'select(.name | test("image_.*OpenWebRX(%2B|\\+)-32bit.*\\.zip")) | .digest' | sed 's/^sha256://')
+  echo "Found ${bits} image: $fname (v${ver}, ${date})"
 
-FILENAME_64=$(basename "$URL_64")
-DATE=$(echo "$FILENAME_64" | sed -n 's/^image_\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\).*/\1/p')
+  member=$(unzip -Z1 "$zipfile" | head -n1)
+  tmpimg=$(mktemp -p "$(dirname "$zipfile")" .extract.XXXXXX)
+  echo "Extracting $member to compute extract_sha256/extract_size..."
+  unzip -p "$zipfile" "$member" > "$tmpimg"
+  extract_size=$(stat -c%s "$tmpimg")
+  extract_sha256=$(sha256sum "$tmpimg" | cut -d' ' -f1)
+  rm -f "$tmpimg"
 
-echo "Latest tag: $TAG"
-echo "Release date (from filename): $DATE"
-echo "Generating $OUTFILE..."
+  download_size=$(stat -c%s "$zipfile")
 
-jq -n \
-  --arg date "$DATE" \
-  --arg icon "$ICON_URL" \
-  --arg url64 "$URL_64" \
-  --arg sha64 "$SHA_64" \
-  --arg url32 "$URL_32" \
-  --arg sha32 "$SHA_32" \
-  --arg tag "$TAG" \
-'
-{
-  os_list: [
-    {
-      name: ("OpenWebRX+ " + $tag + " (64-bit)"),
-      description: "OpenWebRX+ preconfigured Raspberry Pi image (64-bit). Supported: Raspberry Pi 3 / 4 / 5.",
+  # the release tag is assumed to equal $ver, matching the upload convention used for past releases
+  url="https://github.com/${REPO}/releases/download/${ver}/${fname//+/%2B}"
+
+  # same name as the .zip/.info pair, minus the "image_" prefix
+  outfile="${DEPLOY_DIR}/${fname#image_}"
+  outfile="${outfile%.zip}.json"
+
+  jq -n \
+    --arg name "OpenWebRX+ ${ver} (${LABEL[$bits]})" \
+    --arg desc "OpenWebRX+ preconfigured Raspberry Pi image (${LABEL[$bits]}). Supported: Raspberry Pi 3 / 4 / 5." \
+    --arg icon "$ICON_URL" \
+    --arg date "$date" \
+    --arg url "$url" \
+    --arg extract_sha256 "$extract_sha256" \
+    --argjson extract_size "$extract_size" \
+    --argjson image_download_size "$download_size" \
+    --argjson devices "${DEVICES[$bits]}" \
+    '{os_list: [{
+      name: $name,
+      description: $desc,
       icon: $icon,
       release_date: $date,
-      url: $url64,
-      sha256: $sha64,
-      supports_customization: true
-    },
+      url: $url,
+      extract_sha256: $extract_sha256,
+      extract_size: $extract_size,
+      image_download_size: $image_download_size,
+      supports_customization: true,
+      init_format: "cloudinit-rpi",
+      devices: $devices,
+      capabilities: [ "rpi_connect" ]
+    }]}' > "$outfile"
 
-    (if $url32 != "" and $sha32 != "" then
-      {
-        name: ("OpenWebRX+ " + $tag + " (32-bit)"),
-        description: "OpenWebRX+ preconfigured Raspberry Pi image (32-bit). Supported: Raspberry Pi 3 / 4 / 5.",
-        icon: $icon,
-        release_date: $date,
-        url: $url32,
-        sha256: $sha32,
-        supports_customization: true
-      }
-    else empty end)
-  ]
-}
-' > "$OUTFILE"
+  echo "Generated $outfile"
+  found=$((found + 1))
+done
 
-echo "Done. Generated $OUTFILE"
-
+if [[ "$found" -eq 0 ]]; then
+  echo "ERROR: no build artifacts found in $DEPLOY_DIR (expected image_*-OpenWebRX+-64bit-v*.zip / -32bit-v*.zip)" >&2
+  exit 1
+fi

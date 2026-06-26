@@ -11,6 +11,11 @@ cat << EOF > "${ROOTFS_DIR}/etc/openwebrx/openwebrx.conf.d/20-temporary-director
 temporary_directory = /tmp/openwebrx
 EOF
 
+cat << EOF > "${ROOTFS_DIR}/etc/openwebrx/openwebrx.conf.d/21-disable-ipv6.conf.disabled"
+[web]
+ipv6 = false
+EOF
+
 cp files/profile-owrx.sh "${ROOTFS_DIR}/etc/profile.d/owrx.sh"
 cp files/install-softmbe.sh "${ROOTFS_DIR}/usr/local/bin"
 chmod +x "${ROOTFS_DIR}/usr/local/bin/install-softmbe.sh"
